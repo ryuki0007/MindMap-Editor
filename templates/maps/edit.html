@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ mindmap.title }} - Editor</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background-color: #f8f9fa; font-family: sans-serif; }
+        #nav-bar { position: absolute; top: 0; left: 0; width: 100%; height: 50px; background: white; box-shadow: 0 2px 5px rgba(0,0,0,0.1); display: flex; align-items: center; justify-content: space-between; padding: 0 20px; box-sizing: border-box; z-index: 10; }
+        .back-link { color: #1976d2; text-decoration: none; font-weight: bold; font-size: 14px; }
+        .map-title { font-weight: bold; color: #333; padding: 5px 10px; border-radius: 4px; border: 1px dashed transparent; }
+        .map-title:hover { background-color: #f0f2ff; border: 1px dashed #42a5f5; cursor: text; }
+        svg { width: 100%; height: calc(100% - 50px); display: block; margin-top: 50px; }
+
+        .node { cursor: pointer; }
+        .node rect.bg { fill: #c5ccff; rx: 8; ry: 8; stroke: #fff; stroke-width: 2px; }
+        .node text.label { font-size: 16px; fill: #111; text-anchor: middle; dominant-baseline: central; user-select: none; pointer-events: none; }
+        .link { fill: none; stroke: #b0bec5; stroke-width: 2px; }
+
+        .btn { cursor: pointer; }
+        .btn rect { fill: #fff; rx: 4; ry: 4; stroke-width: 1.5px; transition: fill 0.2s; }
+        .btn:hover rect { fill: #f0f0f0; }
+        .btn-add rect { stroke: #cfd8dc; }
+        .btn-add text { fill: #111; font-size: 16px; font-weight: bold; text-anchor: middle; dominant-baseline: central; user-select: none; }
+        .btn-del rect { stroke: #ffcdd2; }
+        .btn-del text { fill: #c62828; font-size: 16px; font-weight: bold; text-anchor: middle; dominant-baseline: central; user-select: none; }
+
+        #editor { position: absolute; display: none; width: 120px; height: 24px; font-size: 14px; text-align: center; border: 2px solid #42a5f5; border-radius: 4px; outline: none; resize: none; z-index: 20; }
+    </style>
+</head>
+<body>
+
+<div id="nav-bar">
+    <a class="back-link" href="{% url 'maps:select' %}">← Back to List</a>
+    <div class="map-title" contenteditable="true" id="map-title-input">{{ mindmap.title }}</div>
+    <div style="width: 80px; font-size: 12px; color: #388e3c; font-weight: bold;" id="save-status"></div>
+</div>
+
+<svg id="canvas"></svg>
+<textarea id="editor"></textarea>
+
+<script>
+    const svg = d3.select("#canvas");
+    const editor = document.getElementById("editor");
+    const statusEl = document.getElementById("save-status");
+
+    let roots = JSON.parse('{{ map_data_json|safe }}');
+    let editingNode = null;
+
+    function generateId() {
+        return 'node-' + Math.random().toString(36).substr(2, 9);
+    }
+
+    const mapTitleEl = document.getElementById('map-title-input');
+    mapTitleEl.addEventListener('blur', saveToServer);
+    mapTitleEl.addEventListener('keydown', (e) => {
+        if(e.key === 'Enter') { e.preventDefault(); mapTitleEl.blur(); }
+    });
+
+    function saveToServer() {
+        statusEl.innerText = "Saving...";
+        statusEl.style.color = "#f57c00";
+
+        const dataToSend = {
+            title: mapTitleEl.innerText.trim(),
+            roots: roots
+        };
+
+        fetch("{% url 'maps:save_map' mindmap.id %}", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(dataToSend)
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.status === 'success') {
+                statusEl.innerText = "✓ Saved";
+                statusEl.style.color = "#388e3c";
+                setTimeout(() => statusEl.innerText = "", 2000);
+            }
+        })
+        .catch(err => console.error("Save Error:", err));
+    }
+
+    function update() {
+        const groups = svg.selectAll(".map-group").data(roots, d => d.id);
+
+        groups.enter()
+            .append("g")
+            .attr("class", "map-group")
+            .merge(groups)
+            .each(function(rootObj) {
+                const group = d3.select(this);
+                group.attr("transform", `translate(${rootObj.x}, ${rootObj.y})`);
+
+                const rootHierarchy = d3.hierarchy(rootObj.data);
+                d3.tree().nodeSize([60, 250])(rootHierarchy);
+
+                const links = group.selectAll(".link").data(rootHierarchy.links(), d => d.target.data.id);
+                links.enter().insert("path", "g")
+                    .attr("class", "link")
+                    .merge(links)
+                    .attr("d", d => {
+                        const srcX = d.source.y + 89;
+                        const srcY = d.source.x;
+                        const tarX = d.target.y - 89;
+                        const tarY = d.target.x;
+                        return `M${srcX},${srcY} C${(srcX+tarX)/2},${srcY} ${(srcX+tarX)/2},${tarY} ${tarX},${tarY}`;
+                    });
+                links.exit().remove();
+
+                const nodes = group.selectAll(".node").data(rootHierarchy.descendants(), d => d.data.id);
+                const nodeEnter = nodes.enter().append("g")
+                    .attr("class", "node")
+                    .on("dblclick", (e, d) => startEdit(e, d));
+
+                nodeEnter.append("rect").attr("class", "bg").attr("width", 120).attr("height", 36).attr("x", -60).attr("y", -18);
+                nodeEnter.append("text").attr("class", "label");
+
+                const btnAdd = nodeEnter.append("g").attr("class", "btn btn-add").attr("transform", "translate(65, -12)");
+                btnAdd.append("rect").attr("width", 24).attr("height", 24).attr("rx", 4);
+                btnAdd.append("text").text("+").attr("x", 12).attr("y", 12);
+
+                const btnDel = nodeEnter.append("g").attr("class", "btn btn-del").attr("transform", "translate(-89, -12)");
+                btnDel.append("rect").attr("width", 24).attr("height", 24).attr("rx", 4);
+                btnDel.append("text").text("×").attr("x", 12).attr("y", 12);
+
+                const nodeMerge = nodeEnter.merge(nodes);
+                nodeMerge.attr("transform", d => `translate(${d.y}, ${d.x})`);
+                nodeMerge.select(".label").text(d => d.data.name);
+
+                nodeMerge.select(".btn-add").on("click", (e, d) => { e.stopPropagation(); addChild(d); });
+                nodeMerge.select(".btn-del").on("click", (e, d) => { e.stopPropagation(); deleteNode(d, rootObj); });
+
+                nodes.exit().remove();
+            });
+
+        groups.exit().remove();
+    }
+
+    svg.on("click", (e) => {
+        if (e.target.tagName !== "svg") return;
+        roots.push({
+            id: generateId(),
+            x: e.offsetX,
+            y: e.offsetY,
+            data: { id: generateId(), name: "New Node", children: [] }
+        });
+        update();
+        saveToServer();
+    });
+
+    function addChild(d) {
+        if (!d.data.children) d.data.children = [];
+        d.data.children.push({ id: generateId(), name: "New Node", children: [] });
+        update();
+        saveToServer();
+    }
+
+    function deleteNode(d, rootObj) {
+        if (d.depth === 0) {
+            roots = roots.filter(r => r.id !== rootObj.id);
+        } else {
+            const siblings = d.parent.data.children;
+            siblings.splice(siblings.findIndex(s => s.id === d.data.id), 1);
+        }
+        update();
+        saveToServer();
+    }
+
+    function startEdit(e, d) {
+        editingNode = d;
+        editor.style.display = "block";
+        editor.value = d.data.name;
+        editor.style.left = (e.pageX - 60) + "px";
+        editor.style.top = (e.pageY - 12) + "px";
+        editor.focus();
+        editor.select();
+    }
+
+    editor.addEventListener("blur", () => {
+        if (editingNode) {
+            editingNode.data.name = editor.value.trim() || "Untitled";
+            editingNode = null;
+            editor.style.display = "none";
+            update();
+            saveToServer();
+        }
+    });
+
+    editor.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" && !e.shiftKey) {
+            e.preventDefault();
+            editor.blur();
+        }
+    });
+
+    update();
+</script>
+</body>
+</html>

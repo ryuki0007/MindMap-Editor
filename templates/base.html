@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+{# Project: MindMap! (Hello World!) #}
+
+{% load static %}
+
+<html lang="ja">
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>{% block title %}{% endblock %}</title>
+
+        {# --- css --- #}
+        <meta http-equiv="Content-Type" content="text/css">
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css"
+              rel="stylesheet">
+        <link href="{% static 'css/app.css' %}" rel="stylesheet">
+        <style type="text/css">
+            {% block extra_css %}{% endblock %}
+        </style>
+        <script language="javascript" type="text/javascript">
+            {% block extra_javascript %}{% endblock %}
+        </script>
+    </head>
+
+    <body>
+        {% block header %}
+        <div class="align-items-center bg-white border-bottom">
+            <h5><a href="{% url 'home' %}">Hello World</a></h5>
+        </div>
+        {% endblock %}
+
+        <div class="container">
+            {% block content %}{% endblock %}
+
+            {% block pagination_footer %}{% endblock %}
+        </div>
+
+        {# --- js --- #}
+        {% block extra_js %}{% endblock %}
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js">
+        </script>
+    </body>
+</html>

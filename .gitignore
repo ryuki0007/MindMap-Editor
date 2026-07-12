@@ -1,0 +1,27 @@
+# OS固有の不要ファイル (Mac)
+.DS_Store
+
+# Pythonが自動生成するキャッシュファイル
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Djangoの設定・データベース・アップロードファイル
+*.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+media/
+
+# 開発エディタ（PyCharmやVS Code）の設定ファイル
+.idea/
+.vscode/
+
+# 仮想環境のフォルダ
+venv/
+.venv/
+env/
+.env/
+
+# パスワードや環境変数を書くファイル（絶対に公開しない）
+.env

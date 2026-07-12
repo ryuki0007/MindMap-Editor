@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Select Mind Map</title>
+    <style>
+        body { font-family: sans-serif; background: #f4f6f8; padding: 40px; margin: 0; }
+        .container { max-width: 600px; margin: 0 auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+        h2 { border-bottom: 2px solid #42a5f5; padding-bottom: 10px; color: #333; margin-top: 0; }
+        .map-list { list-style: none; padding: 0; }
+        .map-item { margin: 15px 0; }
+        .map-link { display: block; padding: 15px; background: #f0f2ff; color: #1976d2; text-decoration: none; border-radius: 6px; font-weight: bold; transition: background 0.2s; }
+        .map-link:hover { background: #e3f2fd; }
+        .logout-btn { display: inline-block; margin-top: 20px; color: #888; text-decoration: none; font-size: 14px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>My Mind Maps</h2>
+
+        <form method="POST" style="margin-bottom: 20px;">
+            {% csrf_token %}
+            <button type="submit" style="padding: 10px 20px; background: #388e3c; color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; transition: background 0.2s;">
+                ➕ Create New Mind Map
+            </button>
+        </form>
+
+        <ul class="map-list">
+            {% for map in maps %}
+                <li class="map-item">
+                    <a class="map-link" href="{% url 'maps:edit' map.id %}">📄 {{ map.title }}</a>
+                </li>
+            {% empty %}
+                <li style="color: #666; list-style: none; padding: 10px 0;">No mind maps yet. Click the button above to create one.</li>
+            {% endfor %}
+        </ul>
+        <a class="logout-btn" href="{% url 'maps:login' %}">← Back to Login</a>
+    </div>
+</body>
+</html>
